@@ -40,15 +40,21 @@ for meet in tree.iterfind("Meeting"):
 meet = "PR"
 raceNo = "1"
 
-race_url = "http://tatts.com/pagedata/racing/%s/%s/%s/%s%s.xml" %(year, month, day, meet, raceNo)
+race_times = {}
+for meet in race_meets.keys():
+    last_race = int(race_meets[meet][1])
+    for raceNo in range(1,last_race+1):
+        race_url = "http://tatts.com/pagedata/racing/%s/%s/%s/%s%s.xml" %(year, month, day, meet, raceNo)
+        print race_url
+        race_xml = urllib2.urlopen(race_url)
+        race_tree = etree.parse(race_xml)
+        race_xml.close()
+        time = race_tree.xpath("//Race")[0].attrib["RaceTime"].split("T")[1]
+        race_times[meet+str(raceNo)] = time
 
-race_xml = urllib2.urlopen(race_url)
+print race_times
 
-race_tree = etree.parse(race_xml)
 
-race_xml.close()
-
-time = race_tree.xpath("//Race")[0].attrib["RaceTime"].split("T")[1]
 
 
 
