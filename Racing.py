@@ -37,9 +37,6 @@ for meet in tree.iterfind("Meeting"):
 ## Next the times for each race
 ###############################
 
-meet = "PR"
-raceNo = "1"
-
 race_times = {}
 for meet in race_meets.keys():
     last_race = int(race_meets[meet][1])
@@ -52,7 +49,10 @@ for meet in race_meets.keys():
         time = race_tree.xpath("//Race")[0].attrib["RaceTime"].split("T")[1]
         race_times[meet+str(raceNo)] = time
 
+print "Race times:" 
 print race_times
+
+
 
 
 
