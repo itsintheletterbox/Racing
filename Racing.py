@@ -53,6 +53,11 @@ print "Race times:"
 print race_times
 
 
+###############################
+## Next get field data
+###############################
+
+
 
 
 
