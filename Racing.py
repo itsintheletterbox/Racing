@@ -7,10 +7,18 @@ from lxml import etree
 from multiprocessing import Pool
 
 ## Parameters
-valid_meets = {"AR", "BR", "MR", "SR", "PR", "NR", "QR", "VR"}
+valid_meets = {"AR"} #, "BR", "MR", "SR", "PR", "NR", "QR", "VR"}
 year = 2014
 month = 11
-day = 01
+day = 26
+
+## Daylight savings time adjustment
+dstAdj = time.localtime().tm_isdst
+
+# Collection times (minutes before/after the race)
+collectTimes = [-30,-25,-20,-15,-10,-5,-4,-3,-2,-1,1,3,5,10]
+collectTimes = [-5,-4,-3,-2,-1,1,3,5]
+
 
 #Function to load xml feed into etree object
 def load_tree(url):
@@ -28,19 +36,6 @@ def load_tree(url):
     
     return tree
     
-#Class to create data tables
-class Table(object):
-    def __init__(self):
-        self.rows = []
-        self.nameMap = {}
-    
-    def addRow(self, row):
-        self.rows.append(row)
-        self.nameMap[row['name']] = row
-        
-    def getRow(self, name):
-        return self.nameMap[name]
-        
 ### Function to check a field exists, then assign the value
 def get_val(var, attr):
     if attr in var.keys():
@@ -216,40 +211,54 @@ for meet in race_meets.keys():
 print "Races:"
 print sorted(raceDict.keys())
 
-# Now split each track into a separate processing stream and loop through the races
-
-#Create multiprocessing pool - one stream for each race meet
-pool = Pool(nMeets)
 
 
-## Daylight savings time adjustment
-dstAdj = time.localtime().tm_isdst
-
-# Collection times (minutes before/after the race)
-collectTimes = [-30,-25,-20,-15,-10,-5,-4,-3,-2,-1,1,3,5,10]
-nCollect = len(collectTimes)
+## Loop over race meets
+fieldDict = {}
 
 
-curMeet = 'AR'
-curRace = '5'
-raceKey = curMeet+curRace
+def raceLoop(meet, collectTimes):
+    nraces = int(race_meets['meet'])
+    
+    for race in range(1,nraces):
+    
+        raceKey = meet+str(race)
 
-raceTimeStr = raceDict[raceKey]['Time'].split(":")
-raceTime = datetime.datetime(year,month,day,int(raceTimeStr[0]),int(raceTimeStr[1]), int(raceTimeStr[2]))
+        raceTimeStr = raceDict[raceKey]['Time'].split(":")
+        raceTime = datetime.datetime(year,month,day,int(raceTimeStr[0]),int(raceTimeStr[1]), int(raceTimeStr[2]))
 
-for wait in collectTimes:
-    curTime = datetime.datetime.now()
-    colTime = raceTime + datetime.timedelta(hours = dstAdj, minutes = wait)
-    waitTime = (colTime-curTime).total_seconds()
-    time.sleep(waitTime)
-    fieldDict[raceKey,wait] = get_field_data(race_tree)
+        if (raceTime + datetime.timedelta(hours = dstAdj, minutes = min(collectTimes))) < datetime.datetime.now():
+            None ## If missed the first collection time skip the race
+        else:
+            for wait in collectTimes:
+                
+                curTime = datetime.datetime.now()
+                colTime = raceTime + datetime.timedelta(hours = dstAdj, minutes = wait)
+                waitTime = (colTime-curTime).total_seconds()
+                
+                print "Waiting for %s%s at %s in %i minutes" %(meet,race,raceTime,waitTime/60)
+                time.sleep(waitTime)
+                fieldDict[raceKey,wait] = get_field_data(race_tree)
+    
+    return fieldDict
+    
+results = {}
 
-
-
-
-
-
-
-#track1 = pool.appy_async(race loop function.., arguments)
-#track2 = ...
+def main():
+    #Create multiprocessing pool - one stream for each race meet
+    pool = Pool(processes = nMeets)
+    
+    for k in range(nMeets):
+        meet = race_meets.keys()[k]
+        print "*** Meet = " + meet + " ***" 
+        try:
+            results[meet] = pool.apply_async(raceLoop, [meet, collectTimes])
+            pool.close()
+            pool.join()
+        except:
+            pool.close()
+        
+if __name__ == '__main__':
+        main()
+        #sys.exit()
 
