@@ -8,9 +8,12 @@ from multiprocessing import Pool
 
 ## Parameters
 valid_meets = {"AR"} #, "BR", "MR", "SR", "PR", "NR", "QR", "VR"}
-year = 2014
-month = 11
-day = 26
+
+## Date
+curDate = datetime.datetime.today()
+year = curDate.year
+month = curDate.month
+day = curDate.day
 
 ## Daylight savings time adjustment
 dstAdj = time.localtime().tm_isdst
@@ -153,7 +156,62 @@ def get_field_data(race_tree):
         
     #Return dict holding details for all runners in the race                         
     return fieldDict
-        
+
+
+
+def raceLoop(meet, collectTimes):
+    nraces = int(race_meets[meet])
+    
+    for race in range(1,nraces):
+    
+        raceKey = meet+str(race)
+
+        raceTimeStr = raceDict[raceKey]['Time'].split(":")
+        raceTime = datetime.datetime(year,month,day,int(raceTimeStr[0]),int(raceTimeStr[1]), int(raceTimeStr[2]))
+
+        if (raceTime + datetime.timedelta(hours = dstAdj, minutes = min(collectTimes))) < datetime.datetime.now():
+            None ## If missed the first collection time skip the race
+        else:
+            for wait in collectTimes:
+                
+                curTime = datetime.datetime.now()
+                colTime = raceTime + datetime.timedelta(hours = dstAdj, minutes = wait)
+                waitTime = (colTime-curTime).total_seconds()
+                
+                print "Waiting for %s%s at %s in %i minutes" %(meet,race,raceTime,waitTime/60)
+                time.sleep(waitTime)
+                fieldDict[raceKey,wait] = get_field_data(race_tree)
+    
+    return fieldDict        
+
+
+def main():
+    
+    for k in range(nMeets):
+        meet = race_meets.keys()[k]
+        print "*** Meet = " + meet + " ***" 
+        raceLoop(meet, collectTimes)
+    
+    
+    #Create multiprocessing pool - one stream for each race meet
+    pool = Pool(processes = nMeets)
+    
+    for k in range(nMeets):
+        meet = race_meets.keys()[k]
+        print "*** Meet = " + meet + " ***" 
+        try:
+            pools[meet] = pool.apply_async(raceLoop, [meet, collectTimes])
+        except:
+            pool.close()
+            
+    pool.close()
+    pool.join()
+    
+    for k in range(nMeets):
+        meet = race_meets.keys()[k]
+        results[meet] = pools[meet].get()
+
+
 
 
 ########################################
@@ -180,19 +238,20 @@ nMeets = len(race_meets.keys())
 
 # Column lookup key for raceDict and fieldDict
 
-raceCol = {"Date", "Code", "Venue", "TrackDescription", "TrackCondition", \
-              "TrackRating", "RaceNo", "Time", "RaceName", "Distance",       \
-              "Favourite", "Tipster", "Tip", "WinPlace", "DivCode",          \
-              "Dividend", "Exotic", "Pool", "ExoticDividend", "DividendId"}
+# raceCols: "Date", "Code", "Venue", "TrackDescription", "TrackCondition", \
+#              "TrackRating", "RaceNo", "Time", "RaceName", "Distance",       \
+#              "Favourite", "Tipster", "Tip", "WinPlace", "DivCode",          \
+#              "Dividend", "Exotic", "Pool", "ExoticDividend", "DividendId"
+#
 
+# fieldCols: "Number", "Name", "Weight", "Jockey", "Form", "RiderChange",    \
+#             "Barrier", "Scratched", "Rating", "Handicap", "WinLast", "Win", \
+#             "PlaceLast", "Place", "FixWin", "RetailWin", "FixPlace",        \
+#             "RetailPlace", "LastTime", "Time"
 
-fieldCol = {"Number", "Name", "Weight", "Jockey", "Form", "RiderChange",    \
-             "Barrier", "Scratched", "Rating", "Handicap", "WinLast", "Win", \
-             "PlaceLast", "Place", "FixWin", "RetailWin", "FixPlace",        \
-             "RetailPlace", "LastTime", "Time"}
+'''
 
 raceDict = {}
-runnerDict = {}
 for meet in race_meets.keys():
     last_race = int(race_meets[meet])
     for raceNo in range(1,last_race+1):
@@ -204,61 +263,25 @@ for meet in race_meets.keys():
         
         # Race data
         raceDict[meet+str(raceNo)] = get_race_data(race_tree)
-        
-        ## Field data
-        #runnerDict[meet+str(raceNo)] = get_field_data(race_tree)
+
 
 print "Races:"
 print sorted(raceDict.keys())
 
+'''
 
 
 ## Loop over race meets
 fieldDict = {}
-
-
-def raceLoop(meet, collectTimes):
-    nraces = int(race_meets['meet'])
-    
-    for race in range(1,nraces):
-    
-        raceKey = meet+str(race)
-
-        raceTimeStr = raceDict[raceKey]['Time'].split(":")
-        raceTime = datetime.datetime(year,month,day,int(raceTimeStr[0]),int(raceTimeStr[1]), int(raceTimeStr[2]))
-
-        if (raceTime + datetime.timedelta(hours = dstAdj, minutes = min(collectTimes))) < datetime.datetime.now():
-            None ## If missed the first collection time skip the race
-        else:
-            for wait in collectTimes:
-                
-                curTime = datetime.datetime.now()
-                colTime = raceTime + datetime.timedelta(hours = dstAdj, minutes = wait)
-                waitTime = (colTime-curTime).total_seconds()
-                
-                print "Waiting for %s%s at %s in %i minutes" %(meet,race,raceTime,waitTime/60)
-                time.sleep(waitTime)
-                fieldDict[raceKey,wait] = get_field_data(race_tree)
-    
-    return fieldDict
-    
+pools = {}   
 results = {}
 
-def main():
-    #Create multiprocessing pool - one stream for each race meet
-    pool = Pool(processes = nMeets)
-    
-    for k in range(nMeets):
-        meet = race_meets.keys()[k]
-        print "*** Meet = " + meet + " ***" 
-        try:
-            results[meet] = pool.apply_async(raceLoop, [meet, collectTimes])
-            pool.close()
-            pool.join()
-        except:
-            pool.close()
-        
+#raceLoop('AR',[-60]) 
+ 
+
 if __name__ == '__main__':
         main()
         #sys.exit()
+
+
 
